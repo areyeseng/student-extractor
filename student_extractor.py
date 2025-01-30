@@ -698,55 +698,44 @@ master_list = {
 # Define valid grades
 valid_grades = ["QUINTO", "SEXTO", "SEPTIMO", "OCTAVO", "NOVENO", "DECIMO", "ONCE"]
 
-# Function to normalize names
 def normalize_name(name):
     name = name.lower().strip()
     name = re.sub(r'[^a-záéíóúñ ]', '', name)
     return name
 
-# Function to split name into components
 def split_name_parts(name):
     return set(normalize_name(name).split())
 
-# Function to extract student names and grades from text
 def extract_students_info(text):
     pattern = r"Pasajero:\s([A-ZÁÉÍÓÚÑ ]+)\sCurso:\s([A-ZÁÉÍÓÚÑ]+)"
     matches = re.findall(pattern, text)
-    students_info = [(match[0].strip(), match[1].strip()) for match in matches]
-    return students_info
+    return [(match[0].strip(), match[1].strip()) for match in matches]
 
-# Function to find the best match in the master list
 def find_best_match(name, grade):
     pdf_name_parts = split_name_parts(name)
     best_match = None
     highest_score = 0
-
+    
     for master_name in master_list.keys():
         master_name_parts = split_name_parts(master_name)
         common_parts = pdf_name_parts.intersection(master_name_parts)
         score = len(common_parts) / max(len(pdf_name_parts), len(master_name_parts)) * 100
-
-        # Use fuzzy matching as a fallback
         fuzzy_score = fuzz.token_sort_ratio(name, master_name)
         final_score = max(score, fuzzy_score)
-
+        
         if final_score > highest_score:
             highest_score = final_score
             best_match = master_name
 
     assigned_class = master_list.get(best_match, "Not Found") if highest_score > 40 else "Not Found"
-
-    # Final check: Grade-Level Consistency
     if assigned_class != "Not Found" and assigned_class.split('-')[0] != str(valid_grades.index(grade) + 5):
         possible_matches = [key for key in master_list.keys() if master_list[key].startswith(str(valid_grades.index(grade) + 5) + '-')]
         best_match, score = process.extractOne(name, possible_matches, scorer=fuzz.token_sort_ratio)
         assigned_class = master_list.get(best_match, "Not Found") if score > 40 else "Not Found"
-
+    
     return assigned_class
 
-# Streamlit UI
 st.title("Student List Extractor")
-
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
 if uploaded_file:
@@ -755,18 +744,15 @@ if uploaded_file:
 
     students_list = extract_students_info(full_text)
     df = pd.DataFrame(students_list, columns=["Name", "Grade"])
-# Ensure all students are included before sorting
     df["Class"] = df["Name"].apply(lambda x: find_best_match(x, df.loc[df["Name"] == x, "Grade"].values[0] if x in df["Name"].values else ""))
     df["Sort_Class"] = df["Class"].apply(lambda x: (int(x.split('-')[0]), int(x.split('-')[1])) if isinstance(x, str) and '-' in x else (99, 99))
 
-# Sort by Class → Grade → Name
     df = df.sort_values(by=["Sort_Class", "Grade", "Name"], ascending=[True, True, True]).drop(columns=["Sort_Class"])
-    df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
+    df = df[df["Grade"].isin(valid_grades)].drop_duplicates().reset_index(drop=True)
+    
+    st.dataframe(df)
 
-    # ✅ Remove the extra index column in the output table
-    st.dataframe(df.reset_index(drop=True))
-
-if st.button("Copy to Clipboard"):
-    text_to_copy = df.to_csv(index=False, header=False, sep="\t")
-    st.text_area("Copy the list below manually:", text_to_copy, height=300)
-    st.success("Copy manually from the box above!")
+    if st.button("Copy to Clipboard"):
+        text_to_copy = df.to_csv(index=False, header=False, sep="\t")
+        st.text_area("Copy the list below manually:", text_to_copy, height=300)
+        st.success("Copy manually from the box above!")
