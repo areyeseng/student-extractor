@@ -766,7 +766,7 @@ if uploaded_file:
     # ✅ Remove the extra index column in the output table
     st.dataframe(df.reset_index(drop=True))
 
- if st.button("Copy to Clipboard"):
+if st.button("Copy to Clipboard"):
     text_to_copy = df.to_csv(index=False, header=False, sep="\t")
     st.text_area("Copy the list below manually:", text_to_copy, height=300)
     st.success("Copy manually from the box above!")
