@@ -757,7 +757,7 @@ if uploaded_file:
     df = pd.DataFrame(students_list, columns=["Name", "Grade"])
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
 
-    progress_bar = st.progress(0)
+    progress_bar.progress(min(1.0, max(0.0, (i + 1) / max(1, total_students))))
     total_students = len(df)
 
     for i, row in df.iterrows():
