@@ -1,6 +1,5 @@
 streamlit
 pdfplumber
 pandas
-numpy
-rapidfuzz
-pyperclip
+fuzzywuzzy
+python-Levenshtein
