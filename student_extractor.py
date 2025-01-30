@@ -2,9 +2,11 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 import re
-import urllib.parse
+import numpy as np
+import pyperclip
 from rapidfuzz import process, fuzz
 
+# ✅ Permanent Master List (Embedded in Script)
 # Permanent Master List (Embedded from CSV)
 master_list = {
     "Arias Tomas ": "5-1",
@@ -702,10 +704,8 @@ valid_grades = ["QUINTO", "SEXTO", "SEPTIMO", "OCTAVO", "NOVENO", "DECIMO", "ONC
 def normalize_name(name):
     name = name.lower().strip()
     name = re.sub(r'[^a-záéíóúñ ]', '', name)
-    return name
-
-def split_name_parts(name):
-    return set(normalize_name(name).split())
+    name_parts = name.split()
+    return " ".join(sorted(name_parts))  # Sorting to help with fuzzy matching
 
 def extract_students_info(text):
     pattern = r"Pasajero:\s([A-ZÁÉÍÓÚÑ ]+)\sCurso:\s([A-ZÁÉÍÓÚÑ]+)"
@@ -713,24 +713,10 @@ def extract_students_info(text):
     return [(match[0].strip(), match[1].strip()) for match in matches]
 
 def find_best_match(name, grade):
-    pdf_name_parts = split_name_parts(name)
-    best_match = None
-    highest_score = 0
-
-    for master_name in master_list.keys():
-        master_name_parts = split_name_parts(master_name)
-        common_parts = pdf_name_parts.intersection(master_name_parts)
-        score = len(common_parts) / max(len(pdf_name_parts), len(master_name_parts)) * 100
-
-        fuzzy_score = fuzz.token_sort_ratio(name, master_name)
-        final_score = max(score, fuzzy_score)
-
-        if final_score > highest_score:
-            highest_score = final_score
-            best_match = master_name
-
-    assigned_class = master_list.get(best_match, "Not Found") if highest_score > 40 else "Not Found"
-    return assigned_class
+    normalized_name = normalize_name(name)
+    best_match, score = process.extractOne(normalized_name, master_list.keys(), scorer=fuzz.token_sort_ratio)
+    assigned_class = master_list.get(best_match, "Not Found") if score > 75 else "Not Found"
+    return best_match, assigned_class
 
 # File uploader
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
@@ -744,22 +730,20 @@ if uploaded_file:
     df = pd.DataFrame(students_list, columns=["Name", "Grade"])
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
 
-    for i, row in df.iterrows():
-        df.at[i, "Class"] = find_best_match(row["Name"], row["Grade"])
+    # Match extracted names to master list
+    df["Matched Name"] = df["Name"].apply(lambda x: find_best_match(x, df.loc[df["Name"] == x, "Grade"].values[0])[0])
+    df["Class"] = df["Name"].apply(lambda x: find_best_match(x, df.loc[df["Name"] == x, "Grade"].values[0])[1])
 
-    df = df.sort_values(by=["Class", "Name"], ascending=[True, True])
-
-    # Save as CSV
-    csv_file = "students_list.csv"
-    df.to_csv(csv_file, index=False)
-
-    # Generate Google Sheets Import URL
-    csv_url = f"https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_REPO/main/{csv_file}"
-    google_sheets_url = f"https://docs.google.com/spreadsheets/u/0/create?import={urllib.parse.quote(csv_url)}"
+    # Sorting the output
+    df = df.sort_values(by=["Class", "Grade", "Matched Name"], ascending=[True, True, True])
+    df = df[["Matched Name", "Grade", "Class"]]
 
     # Display dataframe
     st.write("### Processed Student List")
     st.dataframe(df)
 
-    # Provide link to open in Google Sheets
-    st.markdown(f"[📄 Open in Google Sheets]({google_sheets_url})", unsafe_allow_html=True)
+    # Copy to Clipboard Functionality
+    if st.button("📋 Copy Table to Clipboard"):
+        text_table = df.to_csv(sep='\t', index=False, header=False)
+        pyperclip.copy(text_table)
+        st.success("Copied to clipboard! You can paste it into any document.")
