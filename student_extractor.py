@@ -701,11 +701,17 @@ master_list = {
 # Define valid grades
 valid_grades = ["QUINTO", "SEXTO", "SEPTIMO", "OCTAVO", "NOVENO", "DECIMO", "ONCE"]
 
-def normalize_name(name):
-    name = name.lower().strip()
-    name = re.sub(r'[^a-záéíóúñ ]', '', name)
-    name_parts = name.split()
-    return " ".join(sorted(name_parts))  # Sorting to help with fuzzy matching
+def find_best_match(name, grade):
+    normalized_name = normalize_name(name)
+    best_match = process.extractOne(normalized_name, master_list.keys(), scorer=fuzz.token_sort_ratio)
+
+    if best_match is None:
+        return "Not Found", "Not Found"  # Ensure the function always returns two values
+    
+    matched_name, score = best_match  # Unpack properly
+    assigned_class = master_list.get(matched_name, "Not Found") if score > 80 else "Not Found"
+
+    return matched_name, assigned_class
 
 def extract_students_info(text):
     pattern = r"Pasajero:\s([A-ZÁÉÍÓÚÑ ]+)\sCurso:\s([A-ZÁÉÍÓÚÑ]+)"
@@ -731,8 +737,10 @@ if uploaded_file:
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
 
     # Match extracted names to master list
-    df["Matched Name"] = df.apply(lambda row: find_best_match(row["Name"], row["Grade"])[0] if pd.notna(row["Grade"]) else "Not Found", axis=1)
-    df["Class"] = df.apply(lambda row: find_best_match(row["Name"], row["Grade"])[1] if pd.notna(row["Grade"]) else "Not Found", axis=1)
+    df["Matched Name"], df["Class"] = zip(*df.apply(
+    lambda row: find_best_match(row["Name"], row["Grade"]) if pd.notna(row["Grade"]) else ("Not Found", "Not Found"),
+    axis=1
+))
     
     # Sorting the output
     df = df.sort_values(by=["Class", "Grade", "Matched Name"], ascending=[True, True, True])
