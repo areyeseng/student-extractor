@@ -736,7 +736,8 @@ def find_best_match(name, grade):
     return assigned_class
 
 # Streamlit UI
-st.title("Student List Extractor")
+st.title("Andrew's Test: Extract Students from Early Departures PDF")
+
 
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
