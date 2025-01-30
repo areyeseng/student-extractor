@@ -1,12 +1,9 @@
 import streamlit as st
 import pdfplumber
-import pandas as pd
 import re
-import numpy as np
-import pyperclip
-from rapidfuzz import process, fuzz
+import pandas as pd
+from fuzzywuzzy import process, fuzz
 
-# ✅ Permanent Master List (Embedded in Script)
 # Permanent Master List (Embedded from CSV)
 master_list = {
     "Arias Tomas ": "5-1",
@@ -701,17 +698,13 @@ master_list = {
 # Define valid grades
 valid_grades = ["QUINTO", "SEXTO", "SEPTIMO", "OCTAVO", "NOVENO", "DECIMO", "ONCE"]
 
-def find_best_match(name, grade):
-    normalized_name = normalize_name(name)
-    best_match = process.extractOne(normalized_name, master_list.keys(), scorer=fuzz.token_sort_ratio)
+def normalize_name(name):
+    name = name.lower().strip()
+    name = re.sub(r'[^a-záéíóúñ ]', '', name)
+    return name
 
-    if best_match is None:
-        return "Not Found", "Not Found"  # Ensure the function always returns two values
-    
-    matched_name, score = best_match  # Unpack properly
-    assigned_class = master_list.get(matched_name, "Not Found") if score > 80 else "Not Found"
-
-    return matched_name, assigned_class
+def split_name_parts(name):
+    return set(normalize_name(name).split())
 
 def extract_students_info(text):
     pattern = r"Pasajero:\s([A-ZÁÉÍÓÚÑ ]+)\sCurso:\s([A-ZÁÉÍÓÚÑ]+)"
@@ -719,39 +712,49 @@ def extract_students_info(text):
     return [(match[0].strip(), match[1].strip()) for match in matches]
 
 def find_best_match(name, grade):
-    normalized_name = normalize_name(name)
-    best_match, score = process.extractOne(normalized_name, master_list.keys(), scorer=fuzz.token_sort_ratio)
-    assigned_class = master_list.get(best_match, "Not Found") if score > 75 else "Not Found"
-    return best_match, assigned_class
+    pdf_name_parts = split_name_parts(name)
+    best_match, highest_score = None, 0
+    
+    for master_name in master_list.keys():
+        master_name_parts = split_name_parts(master_name)
+        common_parts = pdf_name_parts.intersection(master_name_parts)
+        score = len(common_parts) / max(len(pdf_name_parts), len(master_name_parts)) * 100
+        fuzzy_score = fuzz.token_sort_ratio(name, master_name)
+        final_score = max(score, fuzzy_score)
+        
+        if final_score > highest_score:
+            highest_score, best_match = final_score, master_name
+    
+    assigned_class = master_list.get(best_match, "Not Found") if highest_score > 40 else "Not Found"
+    
+    # Ensure the grade level is consistent
+    if assigned_class != "Not Found" and assigned_class.split('-')[0] != str(valid_grades.index(grade) + 5):
+        possible_matches = [key for key in master_list if master_list[key].startswith(str(valid_grades.index(grade) + 5) + '-')]
+        best_match, score = process.extractOne(name, possible_matches, scorer=fuzz.token_sort_ratio)
+        assigned_class = master_list.get(best_match, "Not Found") if score > 40 else "Not Found"
+    
+    return assigned_class
 
-# File uploader
+# Streamlit UI
+st.title("Student List Extractor")
+
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
         full_text = "\n".join([page.extract_text() for page in pdf.pages if page.extract_text()])
-
-    # Extract student data
+    
     students_list = extract_students_info(full_text)
     df = pd.DataFrame(students_list, columns=["Name", "Grade"])
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
-
-    # Match extracted names to master list
-    df["Matched Name"], df["Class"] = zip(*df.apply(
-    lambda row: find_best_match(row["Name"], row["Grade"]) if pd.notna(row["Grade"]) else ("Not Found", "Not Found"),
-    axis=1
-))
+    df["Class"] = df.apply(lambda row: find_best_match(row["Name"], row["Grade"]), axis=1)
     
-    # Sorting the output
-    df = df.sort_values(by=["Class", "Grade", "Matched Name"], ascending=[True, True, True])
-    df = df[["Matched Name", "Grade", "Class"]]
-
-    # Display dataframe
-    st.write("### Processed Student List")
+    df["Sort_Class"] = df["Class"].apply(lambda x: (int(x.split('-')[0]), int(x.split('-')[1])) if isinstance(x, str) and '-' in x else (99, 99))
+    df.sort_values(by=["Sort_Class", "Name"], ascending=[True, True], inplace=True)
+    df.drop(columns=["Sort_Class"], inplace=True)
+    
     st.dataframe(df)
-
-    # Copy to Clipboard Functionality
-    if st.button("📋 Copy Table to Clipboard"):
-        text_table = df.to_csv(sep='\t', index=False, header=False)
-        pyperclip.copy(text_table)
-        st.success("Copied to clipboard! You can paste it into any document.")
+    
+    if st.button("Copy to Clipboard"):
+        df.to_clipboard(index=False, header=False)
+        st.success("Copied to clipboard!")
