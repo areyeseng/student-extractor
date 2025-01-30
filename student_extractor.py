@@ -757,12 +757,17 @@ if uploaded_file:
     df = pd.DataFrame(students_list, columns=["Name", "Grade"])
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
 
-    progress_bar.progress(min(1.0, max(0.0, (i + 1) / max(1, total_students))))
+    # ✅ Fix: Initialize progress bar safely
+    progress_bar = st.progress(0)
     total_students = len(df)
 
-    for i, row in df.iterrows():
-        df.at[i, "Class"] = find_best_match(row["Name"], row["Grade"])
-        progress_bar.progress((i + 1) / total_students)
+    # ✅ Fix: Prevent division by zero in progress
+    if total_students > 0:
+        for i, row in df.iterrows():
+            df.at[i, "Class"] = find_best_match(row["Name"], row["Grade"])
+            progress_bar.progress((i + 1) / total_students)
+    else:
+        progress_bar.progress(1.0)  # Instantly complete if no students exist
 
     # ✅ Fix: Ensure "Class" column exists before sorting
     if "Class" in df.columns and not df["Class"].isnull().all():
