@@ -754,6 +754,3 @@ if uploaded_file:
     df.drop(columns=["Sort_Class"], inplace=True)
     
     st.dataframe(df)
-    
-    text_output = df.to_csv(sep='\t', index=False, header=False)
-    st.text_area("Copy and paste this text:", text_output, height=200)
