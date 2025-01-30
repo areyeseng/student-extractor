@@ -2,7 +2,4 @@ streamlit
 pdfplumber
 pandas
 numpy
-fuzzywuzzy
-python-Levenshtein
-re
-urllib3
+rapidfuzz
