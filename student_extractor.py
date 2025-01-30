@@ -731,9 +731,9 @@ if uploaded_file:
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
 
     # Match extracted names to master list
-    df["Matched Name"] = df["Name"].apply(lambda x: find_best_match(x, df.loc[df["Name"] == x, "Grade"].values[0])[0])
-    df["Class"] = df["Name"].apply(lambda x: find_best_match(x, df.loc[df["Name"] == x, "Grade"].values[0])[1])
-
+    df["Matched Name"] = df.apply(lambda row: find_best_match(row["Name"], row["Grade"])[0] if pd.notna(row["Grade"]) else "Not Found", axis=1)
+    df["Class"] = df.apply(lambda row: find_best_match(row["Name"], row["Grade"])[1] if pd.notna(row["Grade"]) else "Not Found", axis=1)
+    
     # Sorting the output
     df = df.sort_values(by=["Class", "Grade", "Matched Name"], ascending=[True, True, True])
     df = df[["Matched Name", "Grade", "Class"]]
