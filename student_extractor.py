@@ -755,6 +755,5 @@ if uploaded_file:
     
     st.dataframe(df)
     
-    if st.button("Copy to Clipboard"):
-        df.to_clipboard(index=False, header=False)
-        st.success("Copied to clipboard!")
+    text_output = df.to_csv(sep='\t', index=False, header=False)
+    st.text_area("Copy and paste this text:", text_output, height=200)
