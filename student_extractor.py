@@ -770,8 +770,12 @@ if uploaded_file:
         df.sort_values(by=["Sort_Class", "Name"], ascending=[True, True], inplace=True)
         df.drop(columns=["Sort_Class"], inplace=True)
 
-    st.dataframe(df)
+  st.dataframe(df.reset_index(drop=True))  # Removes index column
 
     if st.button("Copy to Clipboard"):
-        df.to_clipboard(index=False, header=False)
+
+        import pyperclip
+        text_to_copy = df.to_csv(index=False, header=False, sep="\t")
+        pyperclip.copy(text_to_copy)
         st.success("Copied to clipboard!")
+        
