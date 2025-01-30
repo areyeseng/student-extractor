@@ -1,6 +1,10 @@
 pdfplumber
 pandas
+numpy
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-auth-oauthlib
 fuzzywuzzy
 python-Levenshtein
-streamlit
-pyperclip
