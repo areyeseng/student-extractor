@@ -3,6 +3,7 @@ import pdfplumber
 import re
 import pandas as pd
 from fuzzywuzzy import process, fuzz
+import pyperclip  # ✅ Added for clipboard fix
 
 # Permanent Master List (Embedded from CSV)
 master_list = {
@@ -757,25 +758,11 @@ if uploaded_file:
     df = pd.DataFrame(students_list, columns=["Name", "Grade"])
     df = df[df["Grade"].isin(valid_grades)].drop_duplicates()
 
-    total_students = len(df)
+    # ✅ Remove the extra index column in the output table
+    st.dataframe(df.reset_index(drop=True))
 
-    # ✅ Fix: Prevent division by zero in progress
-    if total_students > 0:
-        for i, row in df.iterrows():
-            df.at[i, "Class"] = find_best_match(row["Name"], row["Grade"])
- 
-    # ✅ Fix: Ensure "Class" column exists before sorting
-    if "Class" in df.columns and not df["Class"].isnull().all():
-        df["Sort_Class"] = df["Class"].apply(lambda x: (int(x.split('-')[0]), int(x.split('-')[1])) if isinstance(x, str) and '-' in x else (99, 99))
-        df.sort_values(by=["Sort_Class", "Name"], ascending=[True, True], inplace=True)
-        df.drop(columns=["Sort_Class"], inplace=True)
-
-  st.dataframe(df.reset_index(drop=True))  # Removes index column
-
+    # ✅ Fix clipboard issue
     if st.button("Copy to Clipboard"):
-
-        import pyperclip
         text_to_copy = df.to_csv(index=False, header=False, sep="\t")
         pyperclip.copy(text_to_copy)
         st.success("Copied to clipboard!")
-        
