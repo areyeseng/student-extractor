@@ -3,7 +3,7 @@ import pdfplumber
 import pandas as pd
 import re
 import urllib.parse
-from fuzzywuzzy import process, fuzz
+from rapidfuzz import process, fuzz
 
 # Permanent Master List (Embedded from CSV)
 master_list = {
