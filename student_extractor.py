@@ -87,7 +87,8 @@ if uploaded_file:
         df.at[i, "Class"] = find_best_match(row["Name"], row["Grade"])
         progress_bar.progress((i + 1) / total_students)
 
-    df["Sort_Class"] = df["Class"].apply(lambda x: (int(x.split('-')[0]), int(x.split('-')[1])) if '-' in x else (99, 99))
+    if "Class" in df.columns:
+    df["Sort_Class"] = df["Class"].apply(lambda x: (int(x.split('-')[0]), int(x.split('-')[1])) if isinstance(x, str) and '-' in x else (99, 99))
     df.sort_values(by=["Sort_Class", "Name"], ascending=[True, True], inplace=True)
     df.drop(columns=["Sort_Class"], inplace=True)
 
